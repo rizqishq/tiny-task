@@ -74,7 +74,7 @@ func main() {
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{
 				"success": false,
-				"message": "failed to insert to database",
+				"message": "failed to create task",
 			})
 			return
 		}
@@ -83,6 +83,50 @@ func main() {
 			"success": true,
 			"message": "task saved successfully",
 			"data":    task,
+		})
+	})
+
+	http.HandleFunc("GET /tasks", func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+
+		query := `
+		SELECT id, title, completed, created_at
+		FROM tasks
+		`
+
+		rows, err := db.Query(ctx, query)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{
+				"success": false,
+				"message": "failed to retrieve data from database",
+			})
+			return
+		}
+
+		tasks := make([]Task, 0)
+		for rows.Next() {
+			var t Task
+			err := rows.Scan(&t.ID, &t.Title, &t.Completed, &t.CreatedAt)
+			if err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]any{
+					"success": false,
+					"message": "failed to scan data",
+				})
+				return
+			}
+
+			tasks = append(tasks, t)
+		}
+
+		if err := rows.Err(); err != nil {
+			panic(err)
+		}
+
+		writeJSON(w, http.StatusOK, map[string]any{
+			"success": true,
+			"message": "tasks retrieved successfully",
+			"data":    tasks,
 		})
 	})
 
