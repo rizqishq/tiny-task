@@ -36,22 +36,70 @@ func main() {
 
 	log.Println("Database connected succesfully")
 
+	http.HandleFunc("POST /tasks", func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+
+		var req CreateTaskRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{
+				"success": false,
+				"message": "failed to read request body",
+			})
+			return
+		}
+
+		if req.Title == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]any{
+				"success": false,
+				"message": "title can not be empty",
+			})
+			return
+		}
+
+		query := `
+		INSERT INTO tasks (title)
+		VALUES ($1)
+		RETURNING id, title, completed, created_at
+		`
+
+		var task Task
+
+		err := db.QueryRow(ctx, query, req.Title).Scan(
+			&task.ID,
+			&task.Title,
+			&task.Completed,
+			&task.CreatedAt,
+		)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{
+				"success": false,
+				"message": "failed to insert to database",
+			})
+			return
+		}
+
+		writeJSON(w, http.StatusCreated, map[string]any{
+			"success": true,
+			"message": "task saved successfully",
+			"data":    task,
+		})
+	})
+
 	http.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 		defer cancel()
 
 		if err := db.Ping(ctx); err != nil {
-			resp := map[string]string{
-				"status":   "error",
-				"database": "disconnected",
-			}
-			writeJSON(w, http.StatusServiceUnavailable, resp)
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{
+				"success": false,
+				"message": "server is asleep",
+			})
 		}
-		resp := map[string]string{
-			"status":   "ok",
-			"database": "connected",
-		}
-		writeJSON(w, http.StatusOK, resp)
+		writeJSON(w, http.StatusOK, map[string]any{
+			"success": true,
+			"message": "server up",
+		})
 	})
 
 	log.Println("Server running on port :6969")

@@ -18,4 +18,4 @@ go run main.go
 
 3. Test API endpoint
 
-You can directly open [html documentation](docs/tiny-tasks-documentation.html) file in the browser and test it there. Or, you can import the [openapi yaml](docs/tiny-tasks-documentation.yaml) file to your HTTP testing tools like Postman, Bruno, etc.
+You can directly open [html documentation](docs/tiny-tasks-documentation.html) file in the browser and test it there.
