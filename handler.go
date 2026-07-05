@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -132,13 +131,8 @@ func (s *Server) getTaskByIDHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
 
-	idStr := r.PathValue("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{
-			"success": false,
-			"message": "invalid task id",
-		})
+	id, ok := parseIDParam(w, r)
+	if !ok {
 		return
 	}
 
@@ -150,7 +144,7 @@ func (s *Server) getTaskByIDHandler(w http.ResponseWriter, r *http.Request) {
 
 	var task Task
 
-	err = s.db.QueryRow(ctx, query, id).Scan(
+	err := s.db.QueryRow(ctx, query, id).Scan(
 		&task.ID,
 		&task.Title,
 		&task.Completed,
@@ -182,13 +176,8 @@ func (s *Server) updateTaskHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
 
-	idStr := r.PathValue("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{
-			"success": false,
-			"message": "invalid task id",
-		})
+	id, ok := parseIDParam(w, r)
+	if !ok {
 		return
 	}
 
@@ -217,7 +206,8 @@ func (s *Server) updateTaskHandler(w http.ResponseWriter, r *http.Request) {
 		`
 
 	var task Task
-	err = s.db.QueryRow(ctx, query, req.Title, req.Completed, id).Scan(
+
+	err := s.db.QueryRow(ctx, query, req.Title, req.Completed, id).Scan(
 		&task.ID,
 		&task.Title,
 		&task.Completed,
@@ -249,13 +239,8 @@ func (s *Server) deleteTaskHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
 
-	idStr := r.PathValue("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{
-			"success": false,
-			"message": "invalid task id",
-		})
+	id, ok := parseIDParam(w, r)
+	if !ok {
 		return
 	}
 
