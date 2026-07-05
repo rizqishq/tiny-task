@@ -3,12 +3,14 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/joho/godotenv/autoload"
 )
@@ -97,6 +99,7 @@ func main() {
 		query := `
 		SELECT id, title, completed, created_at
 		FROM tasks
+		ORDER BY id DESC
 		`
 
 		rows, err := db.Query(ctx, query)
@@ -129,6 +132,7 @@ func main() {
 				"success": false,
 				"message": "failed to retrieve tasks",
 			})
+			return
 		}
 
 		writeJSON(w, http.StatusOK, map[string]any{
@@ -138,7 +142,7 @@ func main() {
 		})
 	})
 
-	http.HandleFunc("GET /task/{id}", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("GET /tasks/{id}", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 		defer cancel()
 
@@ -167,10 +171,17 @@ func main() {
 			&task.CreatedAt,
 		)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{
-				"success": false,
-				"message": "task not found",
-			})
+			if errors.Is(err, pgx.ErrNoRows) {
+				writeJSON(w, http.StatusNotFound, map[string]any{
+					"success": false,
+					"message": "task not found",
+				})
+			} else {
+				writeJSON(w, http.StatusInternalServerError, map[string]any{
+					"success": false,
+					"message": "operation failed",
+				})
+			}
 			return
 		}
 
@@ -181,7 +192,7 @@ func main() {
 		})
 	})
 
-	http.HandleFunc("PATCH /task/{id}", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("PATCH /tasks/{id}", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 		defer cancel()
 
@@ -211,6 +222,14 @@ func main() {
 			return
 		}
 
+		if req.Title == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]any{
+				"success": false,
+				"message": "title can not be empty",
+			})
+			return
+		}
+
 		var task Task
 		err = db.QueryRow(ctx, query, req.Title, req.Completed, id).Scan(
 			&task.ID,
@@ -219,10 +238,17 @@ func main() {
 			&task.CreatedAt,
 		)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{
-				"success": false,
-				"message": "update failed",
-			})
+			if errors.Is(err, pgx.ErrNoRows) {
+				writeJSON(w, http.StatusNotFound, map[string]any{
+					"success": false,
+					"message": "update failed",
+				})
+			} else {
+				writeJSON(w, http.StatusInternalServerError, map[string]any{
+					"success": false,
+					"message": "update failed",
+				})
+			}
 			return
 		}
 
