@@ -3,7 +3,7 @@ package main
 import "time"
 
 type Note struct {
-	ID        int       `json:"id"`
+	ID        int64     `json:"id"`
 	Title     string    `json:"title"`
 	Body      string    `json:"body"`
 	Archived  bool      `json:"archived"`

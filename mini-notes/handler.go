@@ -3,8 +3,12 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
+	"strconv"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) {
@@ -49,7 +53,7 @@ func (s *Server) createNoteHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, note)
 }
 
-func (s *Server) listNoteHandler(w http.ResponseWriter, r *http.Request) {
+func (s *Server) getAllNotesHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
 
@@ -78,4 +82,41 @@ func (s *Server) listNoteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, notes)
+}
+
+func (s *Server) getNoteByIDHandler(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	defer cancel()
+
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+
+	query := `
+	SELECT id, title, body, archived, created_at, updated_at
+	FROM notes
+	WHERE id = $1
+	`
+
+	var note Note
+	err = s.db.QueryRow(ctx, query, id).Scan(
+		&note.ID,
+		&note.Title,
+		&note.Body,
+		&note.Archived,
+		&note.CreatedAt,
+		&note.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "note not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "operation failed")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, note)
 }
