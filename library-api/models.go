@@ -38,3 +38,7 @@ type UpdateBookRequest struct {
 	Title       *string `json:"title"`
 	Description *string `json:"description"`
 }
+
+type UpdateBookStatusRequest struct {
+	Status string `json:"status"`
+}
