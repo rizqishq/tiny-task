@@ -213,3 +213,88 @@ func (s *Server) createBookHandler(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusCreated, b)
 }
+
+func (s *Server) getAllBooksHandler(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	defer cancel()
+
+	query := `
+	SELECT b.id, b.title, b.description, b.status, b.created_at, b.updated_at, a.id, a.name
+	FROM books b
+	JOIN authors a ON a.id = b.author_id
+	ORDER BY b.created_at DESC
+	`
+
+	rows, err := s.db.Query(ctx, query)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to fetch books")
+		return
+	}
+	defer rows.Close()
+
+	books := make([]Book, 0)
+	for rows.Next() {
+		var b Book
+		if err := rows.Scan(
+			&b.ID,
+			&b.Title,
+			&b.Description,
+			&b.Status,
+			&b.CreatedAt,
+			&b.UpdatedAt,
+			&b.Author.ID,
+			&b.Author.Name,
+		); err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to scan book")
+			return
+		}
+		books = append(books, b)
+	}
+
+	if err := rows.Err(); err != nil {
+		writeError(w, http.StatusInternalServerError, "error while reading books")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, books)
+}
+
+func (s *Server) getBookByIdHandler(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	defer cancel()
+
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+
+	query := `
+	SELECT b.id, b.title, b.description, b.status, b.created_at, b.updated_at, a.id, a.name
+	FROM books b
+	JOIN authors a ON a.id = b.author_id
+	WHERE b.id = $1
+	`
+
+	var b Book
+	err = s.db.QueryRow(ctx, query, id).Scan(
+		&b.ID,
+		&b.Title,
+		&b.Description,
+		&b.Status,
+		&b.CreatedAt,
+		&b.UpdatedAt,
+		&b.Author.ID,
+		&b.Author.Name,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "book not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to fetch data")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, b)
+}

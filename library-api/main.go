@@ -39,6 +39,8 @@ func main() {
 	http.HandleFunc("GET /authors", srv.getAllAuthorsHandler)
 	http.HandleFunc("GET /authors/{id}", srv.getAuthorByIdHandler)
 	http.HandleFunc("DELETE /authors/{id}", srv.deleteAuthorHandler)
+	http.HandleFunc("GET /books", srv.getAllBooksHandler)
+	http.HandleFunc("GET /books/{id}", srv.getBookByIdHandler)
 
 	http.HandleFunc("POST /books", srv.createBookHandler)
 
